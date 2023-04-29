@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -11,6 +12,7 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
 )
 
 func main() {
@@ -21,6 +23,51 @@ func main() {
 
 	wg := sync.WaitGroup{}
 	wg.Add(2)
+
+	const (
+		host     = "localhost"
+		port     = 5432
+		user     = "docker"
+		password = "docker"
+		dbname   = "my_database"
+	)
+
+	psqlInfo := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
+
+	db, err := sql.Open("postgres", psqlInfo)
+	if err != nil {
+		panic(err)
+	}
+	defer db.Close()
+
+	err = db.Ping()
+	if err != nil {
+		panic(err)
+	}
+
+	createTable := `
+		CREATE TABLE IF NOT EXISTS albums (
+			id SERIAL PRIMARY KEY,
+			title TEXT,
+			artist TEXT,
+			price FLOAT
+		);
+	`
+
+	_, err = db.Exec(createTable)
+	if err != nil {
+		panic(err)
+	}
+
+	insertData := `
+		INSERT INTO albums (title, artist, price)
+		VALUES ('Imagine', 'John Lennon', 14.99), ('R U Mine?', 'Arctic Monkeys', 12.50), ('Firestarter', 'The Prodigy', 19.75);
+	`
+
+	_, err = db.Exec(insertData)
+	if err != nil {
+		panic(err)
+	}
 
 	go func() {
 		defer wg.Done()
@@ -59,7 +106,7 @@ func main() {
 			return
 		}
 
-		resp, err := http.Post("http://127.0.0.1:8080/albums", "application/json", bytes.NewBuffer(jsonPayload))
+		resp, err := http.Post("http://0.0.0.0:8080/albums", "application/json", bytes.NewBuffer(jsonPayload))
 		if err != nil {
 			displayError(err)
 			return
