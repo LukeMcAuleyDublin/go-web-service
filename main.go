@@ -1,8 +1,14 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io/ioutil"
 	"net/http"
+	"os"
 	"strconv"
+	"sync"
 
 	"github.com/gin-gonic/gin"
 )
@@ -13,7 +19,63 @@ func main() {
 	router.GET("/albums/:id", getAlbumByID)
 	router.POST("/albums", postAlbums)
 
-	router.Run("localhost:8080")
+	wg := sync.WaitGroup{}
+	wg.Add(2)
+
+	go func() {
+		defer wg.Done()
+		if err := router.Run(":8080"); err != nil {
+			fmt.Println("Error starting server: ", err)
+		}
+	}()
+
+	// Test data to POST /albums
+	go func() {
+		defer wg.Done()
+
+		file, err := os.Open("MOCK_DATA.json")
+		if err != nil {
+			fmt.Println(errorMessage{Status: "Error", Message: err.Error()})
+			return
+		}
+		defer file.Close()
+
+		data, err := ioutil.ReadAll(file)
+		if err != nil {
+			displayError(err)
+			return
+		}
+
+		var payload []album
+		err = json.Unmarshal(data, &payload)
+		if err != nil {
+			displayError(err)
+			return
+		}
+
+		jsonPayload, err := json.Marshal(payload)
+		if err != nil {
+			displayError(err)
+			return
+		}
+
+		resp, err := http.Post("http://127.0.0.1:8080/albums", "application/json", bytes.NewBuffer(jsonPayload))
+		if err != nil {
+			displayError(err)
+			return
+		}
+		defer resp.Body.Close()
+
+		body, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			displayError(err)
+			return
+		}
+		fmt.Println("Response status code: ", resp.StatusCode)
+		fmt.Println("Response body: ", string(body))
+	}()
+
+	wg.Wait()
 }
 
 type album struct {
@@ -26,6 +88,10 @@ type album struct {
 type errorMessage struct {
 	Status  string `json:"status"`
 	Message string `json:"message"`
+}
+
+func displayError(e error) {
+	fmt.Println(errorMessage{Status: "Error", Message: e.Error()})
 }
 
 var albums []album
