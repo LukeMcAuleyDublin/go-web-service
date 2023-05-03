@@ -56,26 +56,25 @@ func getAlbumByID(db *sql.DB) func(c *gin.Context) {
 
 func postAlbum(db *sql.DB) func(c *gin.Context) {
 	return func(c *gin.Context) {
-		var a models.Album
-		if err := c.BindJSON(&a); err != nil {
+		var albums struct {
+			Albums []models.Album `json:"albums"`
+		}
+		if err := c.BindJSON(&albums); err != nil {
 			c.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
 
-		res, err := db.Exec("INSERT INTO albums (title, artist, price) VALUES ($1, $2, $3)", a.Title, a.Artist, a.Price)
-		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
-			return
-		}
+		for _, a := range albums.Albums {
+			var id int
+			err := db.QueryRow("INSERT INTO albums (title, artist, price) VALUES ($1, $2, $3) RETURNING id", a.Title, a.Artist, a.Price).Scan(&id)
+			if err != nil {
+				c.AbortWithError(http.StatusInternalServerError, err)
+				return
+			}
+			a.ID = id
 
-		id, err := res.LastInsertId()
-		if err != nil {
-			c.AbortWithError(http.StatusInternalServerError, err)
-			return
+			c.JSON(http.StatusOK, a)
 		}
-		a.ID = int(id)
-
-		c.JSON(http.StatusOK, a)
 	}
 }
 
