@@ -27,9 +27,10 @@ func main() {
 
 	createTableQuery := `
 		CREATE TABLE IF NOT EXISTS albums (
-			Title VARCHAR(50) NOT NULL,
-			Artist VARCHAR(50) NOT NULL,
-			Price REAL NOT NULL
+			ID SERIAL PRIMARY KEY,
+			Title TEXT NOT NULL,
+			Artist TEXT NOT NULL,
+			Price FLOAT NOT NULL
 		)
 	`
 
